@@ -96,54 +96,54 @@ void minMax(struct Pixel img[ALTU_IMG][LARG_IMG], int *min, int *max) {
   _asm{
     //_atribuindo aos registradores
 
-    mov ecx,4096000/16
-    mov ebx,p
-    movups xmm1,mx[0]
-    movups xmm2,mn[0]
+    mov ecx,4096000/16   ;contador=4096000/16
+    mov ebx,p            ;ebx=*img
+    movups xmm1,mx[0]    ;xmm1 recebe 16bytes alinhados de mx
+    movups xmm2,mn[0]    ;xmm2 recebe 16bytes alinhados de mn
 
 //scan array for min & max values
     loop1:
-        movups xmm0,[ebx]
-        pmaxub xmm1,xmm0
-        pminub xmm2,xmm0
-        add ebx,16
-        sub ecx,1
-        jnz loop1
+        movups xmm0,[ebx] ;xmm0=recebe 16bytes alinhados de img
+        pmaxub xmm1,xmm0  ;função max ,armazena em xmm1
+        pminub xmm2,xmm0  ;função min ,armazena em xmm2
+        add ebx,16        ;adiciona ao ponteiro de img mais 16(o que representa a qte de bytes)
+        sub ecx,1         ;subtrai o contador
+        jnz loop1         ;enquanto nao ligar o flag z ,ele volta
 
-        movups mn[0],xmm2
-        movups mx[0],xmm1
+        movups mn[0],xmm2   ;armazena 16bytes em mn
+        movups mx[0],xmm1   ;armazena 16bytes em mx
 
 //determine final maximum value
-        pshufd xmm0,xmm1,‭11110000b
-        pmaxub xmm1,xmm0
-        pshufd xmm0,xmm1,00000110b
-        pmaxub xmm1,xmm0
-        pshufd xmm0,xmm1,‭00000001b
-        pmaxub xmm1,xmm0
-        pextrw eax,xmm0,0
-        cmp al,ah
+        pshufd xmm0,xmm1,‭00001110b ;desloca =final 16 max valores
+        pmaxub xmm1,xmm0           ;função max ,armazena em xmm1
+        pshufd xmm0,xmm1,00000001b ;desloca =final 8 max valores
+        pmaxub xmm1,xmm0           ;função max ,armazena em xmm1
+        pshufd xmm0,xmm1,‭00000001b ;desloca =final 4 max valores
+        pmaxub xmm1,xmm0           ;função max ,armazena em xmm1
+        pextrw eax,xmm0,0          ;ax=2 max values
+        cmp al,ah                  ;max valor
         jae pula
         mov al,ah
     pula:
-        mov edx,0 //convert dl to edx
+        mov edx,0                  ;convert dl to edx
         mov dl,al
-        mov [k],edx
+        mov [k],edx                ;[k]=edx
 
 //determine final minimum value
-        pshufd xmm0,xmm2,‭11110000b
-        pminub xmm2,xmm0
-        pshufd xmm0,xmm2,‭00000110b
-        pminub xmm2,xmm0
-        pshufd xmm0,xmm2,‭00000001b
-        pminub xmm1,xmm0
-        pextrw eax,xmm0,0
-        cmp al,ah
+        pshufd xmm0,xmm2,‭00001110b ;desloca =final 16 min valores
+        pminub xmm2,xmm0           ;função min ,armazena em xmm2
+        pshufd xmm0,xmm2,‭00000001b ;desloca =final 8 min valores
+        pminub xmm2,xmm0           ;função min ,armazena em xmm2
+        pshufd xmm0,xmm2,‭00000001b ;desloca =final 4 min valores
+        pminub xmm1,xmm0           ;função min ,armazena em xmm2
+        pextrw eax,xmm0,0          ;ax=2 min values
+        cmp al,ah                  ;min valor
         jae pula2
         mov al,ah
     pula2:
-        mov edx,0 //convert dl to edx
+        mov edx,0                  ;convert dl to edx
         mov dl,al
-        mov [l],edx
+        mov [l],edx                ;[l]=edx
 
   }
 
@@ -156,9 +156,13 @@ void processa(struct Pixel img[ALTU_IMG][LARG_IMG], struct Pixel imgSai[ALTU_IMG
   int i, j;
   short int f = 255.0 / (max - min) * 1.3 * 32; // ganho 1.3; para evitar o float: * 32 / 32
   min += (max - min) / 100;                     // reduz o nivel do preto
-  for (i = 0; i < ALTU_IMG; i++) {
-    for (j = 0; j < LARG_IMG; j++ ) {//2-trocar linha por coluna
+  for (i = 0; i < ALTU_IMG; i++){
+    for (j = 0; j < LARG_IMG; j+=4) {
       struct Pixel p = img[i][j];
+      struct Pixel q = img[i][j+1];
+      struct Pixel k = img[i][j+2];
+      struct Pixel m = img[i][j+3];
+
       short int v;
       v = ((p.r - min) * f) >> 5; // deslocar 5 bits, significa dividir por 32
       if (v > 255) v = 255;
@@ -173,6 +177,48 @@ void processa(struct Pixel img[ALTU_IMG][LARG_IMG], struct Pixel imgSai[ALTU_IMG
       if (v < 0) v = 0;
       p.b = v;
       imgSai[i][j] = p;
+
+      v = ((q.r - min) * f) >> 5; // deslocar 5 bits, significa dividir por 32
+      if (v > 255) v = 255;
+      if (v < 0) v = 0;
+      q.r = v;
+      v = ((q.g - min)  * f) >> 5;
+      if (v > 255) v = 255;
+      if (v < 0) v = 0;
+      q.g = v;
+      v = ((q.b - min)  * f) >> 5;
+      if (v > 255) v = 255;
+      if (v < 0) v = 0;
+      q.b = v;
+      imgSai[i][j+1] = q;
+
+      v = ((k.r - min) * f) >> 5; // deslocar 5 bits, significa dividir por 32
+      if (v > 255) v = 255;
+      if (v < 0) v = 0;
+      k.r = v;
+      v = ((k.g - min)  * f) >> 5;
+      if (v > 255) v = 255;
+      if (v < 0) v = 0;
+      k.g = v;
+      v = ((k.b - min)  * f) >> 5;
+      if (v > 255) v = 255;
+      if (v < 0) v = 0;
+      k.b = v;
+      imgSai[i][j+2] = k;
+
+      v = ((m.r - min) * f) >> 5; // deslocar 5 bits, significa dividir por 32
+      if (v > 255) v = 255;
+      if (v < 0) v = 0;
+      m.r = v;
+      v = ((m.g - min)  * f) >> 5;
+      if (v > 255) v = 255;
+      if (v < 0) v = 0;
+      m.g = v;
+      v = ((m.b - min)  * f) >> 5;
+      if (v > 255) v = 255;
+      if (v < 0) v = 0;
+      m.b = v;
+      imgSai[i][j+3] = m;
     }
   }
 }
@@ -185,12 +231,10 @@ int main() {
   lePPm("LapisFraco.ppm", imagem);
   printf("Iniciando processamento:\n");
   inicio=clock();
-
-  for (j=0; j<3; j++) {//1-nao necessita fazer tres vezes
+  for (j=0; j<3; j++) {
     minMax(imagem, &min, &max);
     processa(imagem, imagemSai, min, max);
   }
-
   final=clock();
   duracao = (double) (final - inicio) / CLOCKS_PER_SEC;
   printf("Tempo utilizado no processamento = %f\n", duracao);
